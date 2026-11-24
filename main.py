@@ -129,7 +129,7 @@ class CSStatsPlugin(Star):
                 config_path = getattr(self.raw_config, "config_path", None)
                 if config_path and Path(config_path).is_file():
                     try:
-                        disk_data = json.loads(Path(config_path).read_text(encoding="utf-8"))
+                        disk_data = json.loads(Path(config_path).read_text(encoding="utf-8-sig"))
                         if isinstance(disk_data, dict):
                             self.raw_config.update(disk_data)
                     except Exception as exc:
@@ -448,6 +448,12 @@ class CSStatsPlugin(Star):
             elif spec.action == "pw_login":
                 async for result in self._handle_pw_login(event, parsed):
                     yield result
+            elif spec.action == "pw_diag":
+                lines, err = await self._fetch(event, self.pw.diagnose_token())
+                if err:
+                    yield event.plain_result(err)
+                else:
+                    yield event.plain_result("\n".join(lines))
         finally:
             event.stop_event()
 

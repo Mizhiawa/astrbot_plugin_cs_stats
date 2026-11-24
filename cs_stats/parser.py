@@ -77,6 +77,7 @@ def _build_command_table() -> list[tuple[str, CommandSpec]]:
     table["cs查询"] = CommandSpec("su_query", admin_only=True)
     table["完美重载"] = CommandSpec("pw_reload", admin_only=True)
     table["完美登录"] = CommandSpec("pw_login", admin_only=True)
+    table["完美诊断"] = CommandSpec("pw_diag", admin_only=True)
     table["cs帮助"] = CommandSpec("help")
     table["csstats"] = CommandSpec("help")
     table["cs_stats"] = CommandSpec("help")

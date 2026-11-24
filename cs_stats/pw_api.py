@@ -4,6 +4,7 @@ dataSource：3 是完美天梯，1 是官匹（完美同步的 Steam 官方匹�
 头像不用完美的，取 Steam 资料页上的，见 steam_avatar。
 """
 
+import time
 import xml.etree.ElementTree as ET
 
 import httpx
@@ -117,6 +118,83 @@ class PWClient:
         if code == 0:
             return True, "ok"
         return False, f"statusCode={code}, errorMessage={body.get('errorMessage')!r}"
+
+    async def diagnose_token(self) -> list[str]:
+        """用当前已保存的 pw_token / pw_steam_id 探测不同请求头与参数组合（不泄露 token）。"""
+        self._require_auth_config()
+        token = self.config.pw_token
+        sid = int(self.config.pw_steam_id)
+        tail = token[-4:] if len(token) >= 4 else ""
+        ts = str(int(time.time()))
+        base_headers = {
+            "Content-Type": "application/json;charset=UTF-8",
+            "User-Agent": "okhttp/4.11.0",
+            "appversion": self.config.pw_appversion,
+            "platform": "android",
+            "token": token,
+        }
+        base_payload = {
+            "mySteamId": sid,
+            "toSteamId": sid,
+            "accessToken": "",
+            "csgoSeasonId": "",
+        }
+        cases: list[tuple[str, str, dict, dict]] = [
+            ("A_默认android", f"{API}/csgo/home/pvp/detailStats", base_headers, base_payload),
+            (
+                "B_body带accessToken",
+                f"{API}/csgo/home/pvp/detailStats",
+                base_headers,
+                {**base_payload, "accessToken": token},
+            ),
+            (
+                "C_带t+h5_android",
+                f"{API}/csgo/home/pvp/detailStats",
+                {**base_headers, "platform": "h5_android", "t": ts},
+                base_payload,
+            ),
+            (
+                "D_platform=ios",
+                f"{API}/csgo/home/pvp/detailStats",
+                {**base_headers, "platform": "ios"},
+                base_payload,
+            ),
+            (
+                "E_3.5.4无platform",
+                f"{API}/csgo/home/pvp/detailStats",
+                {
+                    "Content-Type": "application/json;charset=UTF-8",
+                    "appversion": "3.5.4.172",
+                    "token": token,
+                },
+                base_payload,
+            ),
+            (
+                "F_官匹detailStats",
+                f"{API}/csgo/home/official/detailStats",
+                base_headers,
+                base_payload,
+            ),
+        ]
+        lines = [
+            f"当前配置: steamId=…{str(sid)[-4:]} (len={len(str(sid))}), "
+            f"token=…{tail} (len={len(token)}), appversion={self.config.pw_appversion}"
+        ]
+        async with httpx.AsyncClient(timeout=self.config.http_timeout) as client:
+            for name, url, hdrs, body in cases:
+                try:
+                    resp = await client.post(url, json=body, headers=hdrs)
+                    data = resp.json()
+                    sc = data.get("statusCode")
+                    msg = data.get("errorMessage")
+                    extra = ""
+                    if sc == 0 and isinstance(data.get("data"), dict):
+                        d = data["data"]
+                        extra = f", season={d.get('seasonId')}, cnt={d.get('cnt')}, name={d.get('name') or d.get('nickName')}"
+                    lines.append(f"- {name}: HTTP {resp.status_code}, statusCode={sc}, msg={msg!r}{extra}")
+                except Exception as exc:
+                    lines.append(f"- {name}: 异常 {get_exc_desc(exc)}")
+        return lines
 
     async def login_with_sms(self, mobile: str, code: str) -> tuple[str, str]:
         """使用完美 App 短信验证码登录，返回 (token, steam_id)。"""

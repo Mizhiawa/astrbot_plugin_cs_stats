@@ -32,7 +32,7 @@ def load_json(
 ) -> JsonLoadResult:
     target = Path(path)
     try:
-        data = json.loads(target.read_text(encoding="utf-8"))
+        data = json.loads(target.read_text(encoding="utf-8-sig"))
         if not isinstance(data, expected_type):
             raise TypeError(
                 f"JSON 顶层应为 {expected_type.__name__}，实际是 {type(data).__name__}"
