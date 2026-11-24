@@ -5,18 +5,21 @@
 锐评的输入从 view 里取；最近对局只有前 RECENT_ROWS 场（recent）画在卡片上，锐评读完整的 history。
 """
 
+import base64
 import math
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 from functools import cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
+import httpx
 import jinja2
 
 from .browser import BrowserPool, build_font_css
 from .config import CSStatsConfig, TEMPLATE_DIR
 from .fivee_api import avatar_url, level_icon, level_name
-from .logging_util import logger
+from .logging_util import get_exc_desc, logger
 
 WIDTH = 720
 MODE_LABEL = {"pvp": "完美天梯", "mm": "官方匹配", "5e": "5E 优先排位"}
@@ -721,25 +724,48 @@ def _jinja_env(template_dir: Path) -> jinja2.Environment:
     )
 
 
+@cache
+def _barlow_data_uri(font_path: Path) -> str | None:
+    if not font_path.is_file():
+        return None
+    b64 = base64.b64encode(font_path.read_bytes()).decode("ascii")
+    return f"data:font/ttf;base64,{b64}"
+
+
+def _inline_local_fonts(html: str, template_dir: Path) -> str:
+    """将模板中相对路径的 BarlowCondensed 字体内联为 data URI，便于 AstrBot 远程文转图服务渲染。"""
+    for filename in ("BarlowCondensed-SemiBold.ttf", "BarlowCondensed-Bold.ttf"):
+        uri = _barlow_data_uri(template_dir / "fonts" / filename)
+        if uri:
+            html = html.replace(f'url("fonts/{filename}")', f'url("{uri}")')
+    return html
+
+
 class CardRenderer:
     def __init__(
         self,
         config: CSStatsConfig,
         browser_pool: BrowserPool,
         template_dir: Path = TEMPLATE_DIR,
+        astrbot_html_render: Callable[..., Awaitable[str]] | None = None,
     ):
         self.config = config
         self.browser_pool = browser_pool
         self.template_dir = template_dir.resolve()
+        self.astrbot_html_render = astrbot_html_render
         self.browser_pool.set_browsers_path(config.render.playwright_browsers_path)
+        self.browser_pool.set_executable_path(config.render.chromium_executable)
 
     def update_config(self, config: CSStatsConfig) -> None:
         self.config = config
         self.browser_pool.set_browsers_path(config.render.playwright_browsers_path)
+        self.browser_pool.set_executable_path(config.render.chromium_executable)
 
-    async def render_html(self, template_name: str, **context) -> str:
+    async def render_html(
+        self, template_name: str, *, include_local_font_css: bool = True, **context
+    ) -> str:
         template = _jinja_env(self.template_dir).get_template(template_name)
-        font_css = build_font_css(self.config.render.font_dir)
+        font_css = build_font_css(self.config.render.font_dir) if include_local_font_css else ""
         full_ctx = {
             "font_css": font_css,
             "watermark_text": self.config.render.watermark_text,
@@ -748,7 +774,7 @@ class CardRenderer:
         }
         return await template.render_async(**full_ctx)
 
-    async def _screenshot(
+    async def _screenshot_playwright(
         self,
         html: str,
         *,
@@ -770,18 +796,85 @@ class CardRenderer:
             )
             return await page.screenshot(full_page=True, type=image_type, timeout=timeout_ms)
 
-    async def _render(self, template_name: str, **context) -> bytes:
+    async def _screenshot_astrbot(self, html: str) -> bytes:
+        """使用 AstrBot 内置 html_render（文转图服务）兜底渲染。"""
+        if self.astrbot_html_render is None:
+            raise RuntimeError("AstrBot html_render 不可用")
+        inlined = _inline_local_fonts(html, self.template_dir)
+        options: dict[str, Any] = {
+            "full_page": True,
+            "type": "png",
+            "viewport": {"width": WIDTH, "height": 10},
+            "device_scale_factor": self.config.render.scale,
+        }
+        result = await self.astrbot_html_render(
+            "{{ _html | safe }}",
+            {"_html": inlined},
+            return_url=False,
+            options=options,
+        )
+        if isinstance(result, (bytes, bytearray)):
+            return bytes(result)
+        target = str(result or "").strip()
+        if not target:
+            raise RuntimeError("AstrBot html_render 返回为空")
+        if target.startswith(("http://", "https://")):
+            async with httpx.AsyncClient(timeout=self.config.http_timeout) as client:
+                resp = await client.get(target)
+                resp.raise_for_status()
+                return resp.content
+        if target.startswith("file://"):
+            target = target[7:]
+        path = Path(target)
+        if path.is_file():
+            return path.read_bytes()
+        raise RuntimeError(f"无法读取 AstrBot html_render 输出: {target}")
+
+    async def _render_via_playwright(self, template_name: str, **context) -> bytes:
         from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
         timeout_ms = self.config.render.image_timeout_ms
         scale = self.config.render.scale
         try:
             html = await self.render_html(template_name, show_images=True, **context)
-            return await self._screenshot(html, width=WIDTH, scale=scale, timeout_ms=timeout_ms)
+            return await self._screenshot_playwright(
+                html, width=WIDTH, scale=scale, timeout_ms=timeout_ms
+            )
         except PlaywrightTimeoutError:
             logger.warning(f"[cs_stats] {template_name} 远程图片加载超时，改为渲染无图版本")
             html = await self.render_html(template_name, show_images=False, **context)
-            return await self._screenshot(html, width=WIDTH, scale=scale, timeout_ms=30_000)
+            return await self._screenshot_playwright(
+                html, width=WIDTH, scale=scale, timeout_ms=30_000
+            )
+
+    async def _render_via_astrbot(self, template_name: str, **context) -> bytes:
+        html = await self.render_html(
+            template_name, include_local_font_css=False, show_images=True, **context
+        )
+        try:
+            return await self._screenshot_astrbot(html)
+        except Exception as exc:
+            logger.warning(
+                f"[cs_stats] AstrBot html_render 带图渲染失败，尝试无图版本: {get_exc_desc(exc)}"
+            )
+            html_no_img = await self.render_html(
+                template_name, include_local_font_css=False, show_images=False, **context
+            )
+            return await self._screenshot_astrbot(html_no_img)
+
+    async def _render(self, template_name: str, **context) -> bytes:
+        backend = self.config.render.backend
+        if backend == "astrbot":
+            return await self._render_via_astrbot(template_name, **context)
+        try:
+            return await self._render_via_playwright(template_name, **context)
+        except Exception as pw_exc:
+            if backend == "auto" and self.astrbot_html_render is not None:
+                logger.warning(
+                    f"[cs_stats] Playwright 渲染不可用，自动回退到 AstrBot 内置文转图: {get_exc_desc(pw_exc)}"
+                )
+                return await self._render_via_astrbot(template_name, **context)
+            raise
 
     async def render_profile(self, view: dict, roast: dict | None = None) -> bytes:
         return await self._render("profile.html", v=view, roast=roast)

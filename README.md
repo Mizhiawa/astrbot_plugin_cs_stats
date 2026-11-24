@@ -20,14 +20,18 @@
 
 ## 安装与部署
 
-1. 将本插件目录放入 AstrBot 的 `data/plugins/astrbot_plugin_cs_stats/` 下。
-2. 安装 Python 依赖与 Playwright Chromium 浏览器：
-   ```bash
-   pip install -r requirements.txt
-   playwright install chromium
-   ```
-   > Linux / Docker 环境下如缺系统库，可执行 `playwright install-deps chromium`，并建议安装中文字体（如 `fonts-noto-cjk` / `fonts-wqy-zenhei`，或在配置 `render.font_dir` 中放入 `MiSans-*.ttf`）。
-3. 在 AstrBot WebUI 中启用或重载插件，并确保已在 **平台管理** 中通过 `aiocqhttp`（反向 WebSocket）连接到 SnowLuma 2.4.2，同时在 **访问控制 -> 管理员** 中配置管理员 QQ 号（字符串格式）。
+1. 在 AstrBot 插件市场安装本插件（或将仓库放入 `data/plugins/astrbot_plugin_cs_stats/`）。
+2. **渲染后端说明（开箱即用 / 本地极速模式二选一）**：
+   - **默认模式（`render.backend = auto`）**：优先使用本地 Playwright Chromium；如果未安装浏览器（例如 Docker 容器首次安装插件），会**自动回退使用 AstrBot 内置文转图（`html_render`）**并内联字体，无需额外操作即可出图。
+   - **本地 Playwright 模式（推荐，出图更快更稳定）**：在 AstrBot 宿主机或 Docker 容器内执行一次即可：
+     ```bash
+     docker exec -it <你的AstrBot容器名> playwright install chromium
+     # 或非 Docker 环境直接运行：
+     playwright install chromium
+     ```
+     > Linux / Docker 环境下如缺少系统依赖或中文字体，可执行 `playwright install-deps chromium`，并安装 `fonts-noto-cjk` / `fonts-wqy-zenhei`（或在 `render.font_dir` 中放入 `MiSans-*.ttf`）。
+3. **国内网络优化**：完美头像默认从 Steam 拉取，超时已缩短至 **3 秒**（`steam_avatar_timeout`），若国内服务器直连 Steam 频繁超时，可在插件配置中将其设为 `0`（跳过 Steam 头像、使用首字母头像）或填写 `steam_proxy`。
+4. 确保已在 AstrBot **平台管理** 中通过 `aiocqhttp`（反向 WebSocket）连接到 SnowLuma 2.4.2，并在 **访问控制 -> 管理员** 中配置管理员 QQ 号（字符串格式）。
 
 ## 完美世界登录配置
 

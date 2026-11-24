@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import shutil
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from functools import lru_cache
@@ -9,6 +10,31 @@ from pathlib import Path
 
 from .config import TEMPLATE_DIR
 from .logging_util import logger
+
+SYSTEM_CHROMIUM_CANDIDATES = (
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/snap/bin/chromium",
+    "C:/Program Files/Google/Chrome/Application/chrome.exe",
+    "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe",
+    "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe",
+    "C:/Program Files/Microsoft/Edge/Application/msedge.exe",
+)
+
+
+def find_system_chromium(configured: str = "") -> str | None:
+    if configured and Path(configured).is_file():
+        return configured
+    for name in ("chromium", "chromium-browser", "google-chrome", "google-chrome-stable"):
+        found = shutil.which(name)
+        if found:
+            return found
+    for path in SYSTEM_CHROMIUM_CANDIDATES:
+        if Path(path).is_file():
+            return path
+    return None
 
 FONT_WEIGHTS = {
     "Regular": 400,
@@ -92,9 +118,36 @@ class BrowserPool:
         self._active = 0
         self._idle_seconds = idle_seconds
         self._browsers_path: str = ""
+        self._executable_path: str = ""
 
     def set_browsers_path(self, path: str) -> None:
         self._browsers_path = path.strip()
+
+    def set_executable_path(self, path: str) -> None:
+        self._executable_path = path.strip()
+
+    async def _launch_chromium(self):
+        launch_args = ["--no-sandbox", "--disable-setuid-sandbox"]
+        if self._executable_path and Path(self._executable_path).is_file():
+            return await self._playwright.chromium.launch(
+                headless=True,
+                executable_path=self._executable_path,
+                args=launch_args,
+            )
+        try:
+            return await self._playwright.chromium.launch(headless=True, args=launch_args)
+        except Exception as exc:
+            system_bin = find_system_chromium(self._executable_path)
+            if system_bin:
+                logger.info(
+                    f"[cs_stats] Playwright 默认浏览器不可用，改用系统浏览器: {system_bin}"
+                )
+                return await self._playwright.chromium.launch(
+                    headless=True,
+                    executable_path=system_bin,
+                    args=launch_args,
+                )
+            raise exc
 
     @asynccontextmanager
     async def page(self, *, device_scale_factor: float = 2, **options) -> AsyncIterator:
@@ -113,10 +166,7 @@ class BrowserPool:
                             if self._browsers_path:
                                 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = self._browsers_path
                             self._playwright = await async_playwright().start()
-                        self._browser = await self._playwright.chromium.launch(
-                            headless=True,
-                            args=["--no-sandbox", "--disable-setuid-sandbox"],
-                        )
+                        self._browser = await self._launch_chromium()
                     self._active += 1
                     acquired = True
                     browser = self._browser

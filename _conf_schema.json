@@ -24,6 +24,18 @@
     "hint": "5E arena 接口偶尔十几秒才返回，建议不低于 15 秒。",
     "default": 20.0
   },
+  "steam_avatar_timeout": {
+    "description": "Steam 头像请求超时（秒，0 表示跳过）",
+    "type": "float",
+    "hint": "国内服务器直连 steamcommunity.com 容易超时；默认 3 秒快速回退到首字母头像，设为 0 可完全跳过。",
+    "default": 3.0
+  },
+  "steam_proxy": {
+    "description": "Steam 头像代理地址（可选）",
+    "type": "string",
+    "hint": "仅用于拉取 Steam 头像，例如 http://127.0.0.1:7890，留空直连。",
+    "default": ""
+  },
   "max_accounts_per_platform": {
     "description": "每平台最大绑定账号数",
     "type": "int",
@@ -159,6 +171,18 @@
     "hint": "Playwright 渲染卡片的画质、字体目录及浏览器路径设置。",
     "default": {},
     "items": {
+      "backend": {
+        "description": "卡片渲染后端（auto / playwright / astrbot）",
+        "type": "string",
+        "hint": "auto（推荐）：优先使用本地 Playwright Chromium，未安装浏览器时自动回退到 AstrBot 内置文转图（html_render）；也可强制指定 playwright 或 astrbot。",
+        "default": "auto"
+      },
+      "chromium_executable": {
+        "description": "自定义 Chromium/Chrome 可执行文件路径（可选）",
+        "type": "string",
+        "hint": "例如 /usr/bin/chromium，留空自动探测 Playwright 及系统浏览器。",
+        "default": ""
+      },
       "image_timeout_ms": {
         "description": "远程资源加载超时（毫秒）",
         "type": "int",

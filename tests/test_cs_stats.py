@@ -501,6 +501,51 @@ class TestViewsAndRoast(unittest.TestCase):
         self.assertIn("Mirage", html_match)
         self.assertIn("13:8", html_match)
 
+    def test_astrbot_html_render_fallback_and_steam_skip(self):
+        from cs_stats.browser import BrowserPool
+        from cs_stats.pw_api import PWClient
+
+        # steam_avatar_timeout=0 时直接跳过请求
+        cfg_skip = CSStatsConfig.from_raw({"steam_avatar_timeout": 0})
+        pw = PWClient(cfg_skip)
+        self.assertEqual(asyncio.run(pw.steam_avatar("76561199058490569")), "")
+
+        # Playwright 不可用时自动回退到 AstrBot html_render，且内联 BarlowCondensed 字体
+        with tempfile.TemporaryDirectory() as tmp:
+            fake_png = Path(tmp) / "out.png"
+            fake_png.write_bytes(b"\x89PNG\r\n\x1a\nfake")
+            captured: dict = {}
+
+            async def fake_html_render(tmpl, data, return_url=True, options=None):
+                captured["tmpl"] = tmpl
+                captured["html"] = data["_html"]
+                captured["options"] = options
+                return str(fake_png)
+
+            cfg_auto = CSStatsConfig.from_raw({"render": {"backend": "astrbot"}})
+            renderer = render_mod.CardRenderer(
+                cfg_auto, BrowserPool(), astrbot_html_render=fake_html_render
+            )
+            png_bytes = asyncio.run(
+                renderer.render_candidates(
+                    "pw",
+                    [
+                        {
+                            "id": "76561199058490569",
+                            "nickname": "Player{{x}}",
+                            "avatar": "",
+                            "score_label": "本赛季天梯分",
+                            "score": 1800,
+                        }
+                    ],
+                    "绑定",
+                )
+            )
+            self.assertEqual(png_bytes, b"\x89PNG\r\n\x1a\nfake")
+            self.assertEqual(captured["tmpl"], "{{ _html | safe }}")
+            self.assertIn("data:font/ttf;base64,", captured["html"])
+            self.assertIn("Player{{x}}", captured["html"])
+
 
 class TestMainPluginMockedAstrBot(unittest.TestCase):
     def test_main_import_and_snowluma_reply_fallback(self):

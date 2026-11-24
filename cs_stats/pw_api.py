@@ -167,10 +167,15 @@ class PWClient:
     async def steam_avatar(self, steam_id: str) -> str:
         """完美的两个图床（img/cdn.wmpvp.com）连续请求就会挂起或 403，所以头像改取 Steam 资料页。
         资料页一人一次请求，单局卡十个人就是十次，所以单局卡不放头像。
-        取不到就返回空串，卡片显示首字母。"""
+        取不到或超时（默认 3 秒）就返回空串，卡片显示首字母。"""
+        if self.config.steam_avatar_timeout <= 0:
+            return ""
         url = f"https://steamcommunity.com/profiles/{steam_id}?xml=1"
         try:
-            async with httpx.AsyncClient(timeout=self.config.http_timeout) as client:
+            async with httpx.AsyncClient(
+                timeout=self.config.steam_avatar_timeout,
+                proxy=self.config.steam_proxy,
+            ) as client:
                 resp = await client.get(url)
                 resp.raise_for_status()
             return ET.fromstring(resp.text).findtext("avatarFull") or ""

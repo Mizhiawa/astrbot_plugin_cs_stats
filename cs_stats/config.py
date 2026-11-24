@@ -71,6 +71,8 @@ class LLMSettings:
 
 @dataclass
 class RenderSettings:
+    backend: str = "auto"
+    chromium_executable: str = ""
     image_timeout_ms: int = 15_000
     scale: float = 2.0
     font_dir: str = ""
@@ -84,6 +86,8 @@ class CSStatsConfig:
     pw_steam_id: str = ""
     pw_appversion: str = "4.2.1.232"
     http_timeout: float = 20.0
+    steam_avatar_timeout: float = 3.0
+    steam_proxy: str | None = None
     max_accounts_per_platform: int = 3
     pvp_season_lookback: int = 4
     command_prefix: str = ""
@@ -124,11 +128,17 @@ class CSStatsConfig:
         if watermark is None:
             watermark = "Designed by Hakuchumu\nPowered by AstrBot"
 
+        render_backend = _to_str(render_raw.get("backend"), "auto").lower()
+        if render_backend not in ("auto", "playwright", "astrbot"):
+            render_backend = "auto"
+
         return cls(
             pw_token=_to_str(data.get("pw_token"), ""),
             pw_steam_id=_to_str(data.get("pw_steam_id"), ""),
             pw_appversion=_to_str(data.get("pw_appversion"), "4.2.1.232") or "4.2.1.232",
             http_timeout=_to_float(data.get("http_timeout"), 20.0, minimum=1.0),
+            steam_avatar_timeout=_to_float(data.get("steam_avatar_timeout"), 3.0, minimum=0.0),
+            steam_proxy=_to_str(data.get("steam_proxy"), "") or None,
             max_accounts_per_platform=_to_int(
                 data.get("max_accounts_per_platform"), 3, minimum=1
             ),
@@ -154,6 +164,8 @@ class CSStatsConfig:
                 extra_body=dict(extra_body),
             ),
             render=RenderSettings(
+                backend=render_backend,
+                chromium_executable=_to_str(render_raw.get("chromium_executable"), ""),
                 image_timeout_ms=_to_int(render_raw.get("image_timeout_ms"), 15_000, minimum=2000),
                 scale=_to_float(render_raw.get("scale"), 2.0, minimum=1.0),
                 font_dir=_to_str(render_raw.get("font_dir"), ""),

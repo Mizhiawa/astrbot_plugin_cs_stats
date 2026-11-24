@@ -107,7 +107,11 @@ class CSStatsPlugin(Star):
         self.pw = PWClient(self.cfg)
         self.fivee = FiveEClient(self.cfg)
         self.browser_pool = BrowserPool()
-        self.renderer = CardRenderer(self.cfg, self.browser_pool)
+        self.renderer = CardRenderer(
+            self.cfg,
+            self.browser_pool,
+            astrbot_html_render=getattr(self, "html_render", None),
+        )
 
     async def terminate(self) -> None:
         """卸载或重载插件时关闭 Playwright 浏览器，避免残留进程。"""
@@ -230,7 +234,10 @@ class CSStatsPlugin(Star):
             return await coro, None
         except Exception:
             logger.exception("[cs_stats] 图片渲染失败")
-            return None, "图片生成失败（请检查 Playwright Chromium 及运行环境）"
+            return None, (
+                "图片生成失败：当前环境未安装 Playwright Chromium 且内置文转图失败。\n"
+                "请在 AstrBot 容器内执行 `playwright install chromium`，或检查 AstrBot 文转图配置。"
+            )
 
     # ============== 数据加载：战绩、锐评、管理员查询共用 ==============
 
