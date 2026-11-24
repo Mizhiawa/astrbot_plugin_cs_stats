@@ -67,7 +67,7 @@ class PWClient:
             resp.raise_for_status()
             return resp.json()
 
-    def _unwrap(self, data: dict, what: str):
+    def _unwrap(self, data: dict, what: str, *, ctx: str = ""):
         if data.get("statusCode") == 0:
             return data.get("data")
         if data.get("statusCode") == TOKEN_INVALID_CODE:
@@ -81,6 +81,11 @@ class PWClient:
             newly = not self.token_invalid
             self.token_invalid = True
             raise PWTokenInvalid(newly=newly)
+        logger.warning(
+            f"[cs_stats] 完美接口 {what} 返回异常: "
+            f"statusCode={data.get('statusCode')}, errorMessage={data.get('errorMessage')!r}, "
+            f"appversion={self.config.pw_appversion!r}, {ctx}"
+        )
         raise PWError(f"{what}失败：{data.get('errorMessage') or data.get('statusCode')}")
 
     def _ids(self, steam_id: str) -> dict:
@@ -155,9 +160,18 @@ class PWClient:
 
     async def _pvp_season(self, steam_id: str, season: str) -> dict:
         payload = {**self._ids(steam_id), "accessToken": "", "csgoSeasonId": season}
-        return self._unwrap(
-            await self._post(f"{API}/csgo/home/pvp/detailStats", payload), "完美天梯生涯"
+        ctx = (
+            f"mySteamId={payload['mySteamId']}, toSteamId={payload['toSteamId']}, "
+            f"csgoSeasonId={season!r}"
         )
+        resp = await self._post(f"{API}/csgo/home/pvp/detailStats", payload)
+        data = self._unwrap(resp, "完美天梯生涯", ctx=ctx)
+        if isinstance(data, dict):
+            logger.info(
+                f"[cs_stats] 完美天梯生涯成功: {ctx}, seasonId={data.get('seasonId')!r}, "
+                f"cnt={data.get('cnt')!r}, name={data.get('name')!r}"
+            )
+        return data
 
     async def pvp_stats(self, steam_id: str) -> dict:
         """本赛季没打就往前找有数据的赛季；都没有时返回本赛季（cnt 为 0）。"""
@@ -204,8 +218,12 @@ class PWClient:
             "csgoSeasonId": "recent",
             "pvpType": -1,
         }
+        ctx = (
+            f"mySteamId={payload['mySteamId']}, toSteamId={payload['toSteamId']}, "
+            f"dataSource={payload['dataSource']}"
+        )
         data = self._unwrap(
-            await self._post(f"{API}/csgo/home/match/list", payload), "对局列表"
+            await self._post(f"{API}/csgo/home/match/list", payload), "对局列表", ctx=ctx
         )
         return bool(data.get("dataPublic")), data.get("matchList") or []
 
