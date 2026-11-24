@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from cs_stats.json_io import atomic_write_json, load_json  # noqa: E402
 
-DEFAULT_APPVERSION = "4.2.1.232"
+DEFAULT_APPVERSION = "4.2.3.234"
 CONFIG_FILENAME = "astrbot_plugin_cs_stats_config.json"
 
 

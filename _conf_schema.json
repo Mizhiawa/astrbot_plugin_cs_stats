@@ -15,8 +15,8 @@
   "pw_appversion": {
     "description": "完美电竞 App 版本号",
     "type": "string",
-    "hint": "请求完美私有接口时携带的 appversion 请求头。",
-    "default": "4.2.1.232"
+    "hint": "请求完美私有接口时携带的 appversion 请求头，过旧版本会被完美接口拒绝（4001）。",
+    "default": "4.2.3.234"
   },
   "http_timeout": {
     "description": "平台接口请求超时（秒）",

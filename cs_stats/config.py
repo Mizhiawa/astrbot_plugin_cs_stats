@@ -84,7 +84,7 @@ class RenderSettings:
 class CSStatsConfig:
     pw_token: str = ""
     pw_steam_id: str = ""
-    pw_appversion: str = "4.2.1.232"
+    pw_appversion: str = "4.2.3.234"
     http_timeout: float = 20.0
     steam_avatar_timeout: float = 3.0
     steam_proxy: str | None = None
@@ -135,7 +135,7 @@ class CSStatsConfig:
         return cls(
             pw_token=_to_str(data.get("pw_token"), ""),
             pw_steam_id=_to_str(data.get("pw_steam_id"), ""),
-            pw_appversion=_to_str(data.get("pw_appversion"), "4.2.1.232") or "4.2.1.232",
+            pw_appversion=_to_str(data.get("pw_appversion"), "4.2.3.234") or "4.2.3.234",
             http_timeout=_to_float(data.get("http_timeout"), 20.0, minimum=1.0),
             steam_avatar_timeout=_to_float(data.get("steam_avatar_timeout"), 3.0, minimum=0.0),
             steam_proxy=_to_str(data.get("steam_proxy"), "") or None,

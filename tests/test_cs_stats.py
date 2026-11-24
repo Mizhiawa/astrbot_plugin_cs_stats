@@ -65,7 +65,7 @@ class TestConfigAndSchema(unittest.TestCase):
 
     def test_config_defaults_and_overrides(self):
         cfg = CSStatsConfig.from_raw({})
-        self.assertEqual(cfg.pw_appversion, "4.2.1.232")
+        self.assertEqual(cfg.pw_appversion, "4.2.3.234")
         self.assertEqual(cfg.llm.mode, "astrbot")
         self.assertEqual(cfg.max_accounts_per_platform, 3)
 
@@ -506,9 +506,26 @@ class TestViewsAndRoast(unittest.TestCase):
         from cs_stats.pw_api import PWClient
 
         # steam_avatar_timeout=0 时直接跳过请求
-        cfg_skip = CSStatsConfig.from_raw({"steam_avatar_timeout": 0})
+        cfg_skip = CSStatsConfig.from_raw({"steam_avatar_timeout": 0, "pvp_season_lookback": 2})
         pw = PWClient(cfg_skip)
         self.assertEqual(asyncio.run(pw.steam_avatar("76561199058490569")), "")
+
+        # pvp_stats 回溯历史赛季遇到「无效的账号」应跳过而不是中断查询
+        from cs_stats.pw_api import PWError
+
+        async def fake_pvp_season(steam_id: str, season: str):
+            if season == "":
+                return {"seasonId": "S23", "cnt": 0}
+            if season == "S22":
+                raise PWError("完美天梯生涯失败：无效的账号")
+            if season == "S21":
+                return {"seasonId": "S21", "cnt": 12}
+            return {"seasonId": season, "cnt": 0}
+
+        pw._pvp_season = fake_pvp_season  # type: ignore[method-assign]
+        res = asyncio.run(pw.pvp_stats("76561199058490569"))
+        self.assertEqual(res["seasonId"], "S21")
+        self.assertEqual(res["cnt"], 12)
 
         # Playwright 不可用时自动回退到 AstrBot html_render，且内联 BarlowCondensed 字体
         with tempfile.TemporaryDirectory() as tmp:

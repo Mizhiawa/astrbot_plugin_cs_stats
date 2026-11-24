@@ -171,7 +171,16 @@ class PWClient:
         for back in range(1, self.config.pvp_season_lookback + 1):
             if season_no - back <= 0:
                 break
-            data = await self._pvp_season(steam_id, f"S{season_no - back}")
+            season_id = f"S{season_no - back}"
+            try:
+                data = await self._pvp_season(steam_id, season_id)
+            except PWTokenInvalid:
+                raise
+            except PWError as exc:
+                logger.info(
+                    f"[cs_stats] 回溯完美天梯赛季 {season_id} 无数据/跳过 ({steam_id}): {exc}"
+                )
+                continue
             if int(data.get("cnt") or 0) > 0:
                 return data
         return current
