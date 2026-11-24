@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<style>
+{{ font_css | safe }}
+{% include "base.css" %}
+.wrap { padding: 24px 24px 0; border-top: 4px solid var(--plate); }
+.head { font-size: 22px; font-weight: 800; }
+.hint { margin-top: 4px; font-size: 14px; color: var(--dim); }
+.list { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
+.item { display: flex; align-items: center; gap: 14px; padding: 12px 16px; background: var(--glass); border: 1px solid var(--rule); }
+.no { width: 36px; flex: none; font-size: 30px; text-align: center; color: var(--plate); }
+.avatar { width: 54px; height: 54px; object-fit: cover; flex: none; background: #1b2531; border: 1px solid rgba(255, 255, 255, 0.4); }
+.avatar-fallback { display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 800; }
+.who { flex: 1; min-width: 0; }
+.name { font-size: 18px; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.id { margin-top: 2px; font-size: 13px; color: var(--dim); }
+.score { text-align: right; flex: none; }
+.score-label { font-size: 12px; color: var(--dim); }
+.score-value { font-size: 24px; }
+</style>
+</head>
+<body class="mode-{{ 'pvp' if platform == 'pw' else '5e' }}">
+<div class="wrap">
+  <div class="head">{{ purpose }}哪个{{ '完美' if platform == 'pw' else ' 5E ' }}账号？</div>
+  <div class="hint">{{ '看看是不是这个号' if candidates | length == 1 else '搜到 %d 个号，回复序号选一个' % (candidates | length) }}</div>
+  <div class="list">
+    {% for c in candidates %}
+    <div class="item">
+      <div class="no num">{{ loop.index }}</div>
+      {% if show_images and c.avatar %}<img class="avatar" src="{{ c.avatar }}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">{% endif %}
+      <div class="avatar avatar-fallback" {% if show_images and c.avatar %}style="display:none"{% endif %}>{{ c.nickname[:1] }}</div>
+      <div class="who">
+        <div class="name">{{ c.nickname }}</div>
+        <div class="id">{{ ('SteamID ' if platform == 'pw' else '5E ID ') ~ c.id }}{% if c.extra %}，{{ c.extra }}{% endif %}</div>
+      </div>
+      <div class="score">
+        <div class="score-label">{{ c.score_label }}</div>
+        <div class="score-value num">{{ c.score }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+<div class="footer"><span>{{ watermark_text }}</span><span>{{ generated_at }}</span></div>
+</body>
+</html>

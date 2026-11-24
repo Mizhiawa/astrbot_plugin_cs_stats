@@ -1,0 +1,192 @@
+{
+  "pw_token": {
+    "description": "完美电竞登录 Token",
+    "type": "string",
+    "hint": "完美天梯与官匹战绩接口所需的登录 token。可通过私聊管理员命令「完美登录 <手机号> <验证码>」或运行 scripts/pw_login.py 获取并写入。",
+    "obvious_hint": true,
+    "default": ""
+  },
+  "pw_steam_id": {
+    "description": "完美账号对应的 SteamID64",
+    "type": "string",
+    "hint": "与 pw_token 对应的 17 位 SteamID64（由登录接口自动返回）。",
+    "default": ""
+  },
+  "pw_appversion": {
+    "description": "完美电竞 App 版本号",
+    "type": "string",
+    "hint": "请求完美私有接口时携带的 appversion 请求头。",
+    "default": "4.2.1.232"
+  },
+  "http_timeout": {
+    "description": "平台接口请求超时（秒）",
+    "type": "float",
+    "hint": "5E arena 接口偶尔十几秒才返回，建议不低于 15 秒。",
+    "default": 20.0
+  },
+  "max_accounts_per_platform": {
+    "description": "每平台最大绑定账号数",
+    "type": "int",
+    "hint": "单个 QQ 在完美平台和 5E 平台各自最多可绑定的账号数量。",
+    "default": 3
+  },
+  "pvp_season_lookback": {
+    "description": "完美天梯赛季回溯数",
+    "type": "int",
+    "hint": "当本赛季没有完美天梯记录时，最多往前查找几个赛季。",
+    "default": 4
+  },
+  "command_prefix": {
+    "description": "命令前缀（留空支持无前缀及 / 前缀）",
+    "type": "string",
+    "hint": "默认留空：发送「完美战绩」或「/完美战绩」均可触发；若设为「/」则仅匹配带该前缀的命令。",
+    "default": ""
+  },
+  "allow_private": {
+    "description": "是否允许私聊使用普通查询和绑定命令",
+    "type": "bool",
+    "hint": "关闭后普通查询/绑定仅在群聊生效（管理员命令在私聊始终可用）。",
+    "default": true
+  },
+  "enabled_groups": {
+    "description": "白名单群号（留空表示不限制）",
+    "type": "list",
+    "hint": "填入字符串形式的群号；非空时仅在这些群内响应。",
+    "default": [],
+    "items": {
+      "type": "string"
+    }
+  },
+  "disabled_groups": {
+    "description": "黑名单群号",
+    "type": "list",
+    "hint": "这些群内将忽略本插件的所有命令。",
+    "default": [],
+    "items": {
+      "type": "string"
+    }
+  },
+  "query_cooldown_seconds": {
+    "description": "群聊战绩查询冷却（秒）",
+    "type": "int",
+    "hint": "同群同用户触发战绩/单局查询的冷却时间，0 表示不限，管理员不受限制。",
+    "default": 10
+  },
+  "roast_cooldown_seconds": {
+    "description": "群聊 AI 锐评冷却（秒）",
+    "type": "int",
+    "hint": "同群同用户新生成 AI 锐评的冷却时间（命中缓存不扣 CD），0 表示不限，管理员不受限制。",
+    "default": 30
+  },
+  "session_timeout_seconds": {
+    "description": "选号交互等待超时（秒）",
+    "type": "int",
+    "hint": "绑定或 cs查询 出现候选列表后，等待用户回复序号/确认的超时时间。",
+    "default": 60
+  },
+  "llm": {
+    "description": "AI 锐评模型配置",
+    "type": "object",
+    "hint": "默认使用 AstrBot 当前会话已配置的 LLM；也可切换为 custom 使用独立的 OpenAI 兼容接口。",
+    "default": {},
+    "items": {
+      "mode": {
+        "description": "LLM 调用模式（astrbot 或 custom）",
+        "type": "string",
+        "hint": "astrbot：直接使用 AstrBot 自身的对话模型；custom：使用下方独立的 OpenAI 兼容 API。",
+        "default": "astrbot"
+      },
+      "astrbot_provider_id": {
+        "description": "指定 AstrBot Provider ID（可选）",
+        "type": "string",
+        "hint": "mode 为 astrbot 时留空表示使用当前会话的默认模型，也可填入指定 Provider ID。",
+        "default": ""
+      },
+      "api_key": {
+        "description": "自定义 API Key",
+        "type": "string",
+        "hint": "mode 为 custom 时必填。",
+        "default": ""
+      },
+      "base_url": {
+        "description": "自定义 Base URL",
+        "type": "string",
+        "hint": "mode 为 custom 时填写，例如 https://api.openai.com/v1。",
+        "default": ""
+      },
+      "model": {
+        "description": "自定义模型名称",
+        "type": "string",
+        "hint": "mode 为 custom 时填写，例如 gpt-4o-mini / deepseek-chat。",
+        "default": ""
+      },
+      "timeout": {
+        "description": "自定义 LLM 超时（秒）",
+        "type": "float",
+        "default": 120.0
+      },
+      "proxy": {
+        "description": "自定义 LLM 代理地址（可选）",
+        "type": "string",
+        "hint": "例如 http://127.0.0.1:7890，留空不使用代理。",
+        "default": ""
+      },
+      "max_tokens": {
+        "description": "自定义最大输出 Token 数",
+        "type": "int",
+        "default": 4096
+      },
+      "thinking_enabled": {
+        "description": "是否启用思考模式（thinking）",
+        "type": "bool",
+        "default": false
+      },
+      "reasoning_effort": {
+        "description": "推理强度（可选：low / medium / high）",
+        "type": "string",
+        "default": ""
+      },
+      "extra_body": {
+        "description": "额外请求体参数（JSON 对象）",
+        "type": "dict",
+        "default": {}
+      }
+    }
+  },
+  "render": {
+    "description": "渲染与字体配置",
+    "type": "object",
+    "hint": "Playwright 渲染卡片的画质、字体目录及浏览器路径设置。",
+    "default": {},
+    "items": {
+      "image_timeout_ms": {
+        "description": "远程资源加载超时（毫秒）",
+        "type": "int",
+        "hint": "头像、地图、武器图超时后自动降级为无图卡片。",
+        "default": 15000
+      },
+      "scale": {
+        "description": "截图缩放倍率（DPR）",
+        "type": "float",
+        "default": 2.0
+      },
+      "font_dir": {
+        "description": "自定义中文字体目录（可选）",
+        "type": "string",
+        "hint": "可放置 MiSans-Regular.ttf / Medium / Semibold / Bold / Heavy；留空自动查找系统 CJK 字体。",
+        "default": ""
+      },
+      "playwright_browsers_path": {
+        "description": "Playwright 浏览器目录（可选）",
+        "type": "string",
+        "hint": "留空使用 Playwright 默认路径。",
+        "default": ""
+      },
+      "watermark_text": {
+        "description": "卡片左下角水印文字",
+        "type": "text",
+        "default": "Designed by Hakuchumu\nPowered by AstrBot"
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+name: astrbot_plugin_cs_stats
+display_name: CS2 战绩查询与锐评
+desc: 移植自 HakuBot 的 CS2 战绩查询插件，支持完美世界竞技平台（天梯/官匹）与 5E 对战平台的生涯/单局战绩卡片渲染、多账号绑定及 AI 毒舌锐评，适配 AstrBot 4.29.4 与 SnowLuma 2.4.2 (OneBot v11)。
+version: 1.0.0
+author: HakuchumuHYX (ported to AstrBot)
+repo: https://github.com/Mizhiawa/astrbot_plugin_cs_stats
+astrbot_version: ">=4.0.0"
+support_platforms:
+  - aiocqhttp
+tags:
+  - game
+  - cs2
+  - stats
+  - image
