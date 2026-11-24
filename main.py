@@ -117,12 +117,23 @@ class CSStatsPlugin(Star):
         """卸载或重载插件时关闭 Playwright 浏览器，避免残留进程。"""
         await self.browser_pool.close()
 
-    def _reload_config(self) -> None:
-        if hasattr(self.raw_config, "load_config"):
-            try:
-                self.raw_config.load_config()
-            except Exception as exc:
-                logger.warning(f"[cs_stats] 重新加载配置文件失败: {get_exc_desc(exc)}")
+    def _reload_config(self, *, from_disk: bool = True) -> None:
+        if from_disk:
+            load_fn = getattr(self.raw_config, "load_config", None)
+            if callable(load_fn):
+                try:
+                    load_fn()
+                except Exception as exc:
+                    logger.warning(f"[cs_stats] 重新加载配置文件失败: {get_exc_desc(exc)}")
+            else:
+                config_path = getattr(self.raw_config, "config_path", None)
+                if config_path and Path(config_path).is_file():
+                    try:
+                        disk_data = json.loads(Path(config_path).read_text(encoding="utf-8"))
+                        if isinstance(disk_data, dict):
+                            self.raw_config.update(disk_data)
+                    except Exception as exc:
+                        logger.warning(f"[cs_stats] 从磁盘重载配置失败: {get_exc_desc(exc)}")
         self.cfg = CSStatsConfig.from_raw(self.raw_config)
         self.pw.update_config(self.cfg)
         self.fivee.update_config(self.cfg)
@@ -766,8 +777,12 @@ class CSStatsPlugin(Star):
         token, steam_id = result
         self.raw_config["pw_token"] = token
         self.raw_config["pw_steam_id"] = steam_id
-        if hasattr(self.raw_config, "save_config"):
-            self.raw_config.save_config()
-        self._reload_config()
+        save_fn = getattr(self.raw_config, "save_config", None)
+        if callable(save_fn):
+            save_fn()
+        self._reload_config(from_disk=False)
         self.pw.reset_token_state()
-        yield event.plain_result(f"完美登录成功，已自动保存配置（SteamID …{steam_id[-4:]}），完美查询已就绪")
+        yield event.plain_result(
+            f"完美登录成功，已自动保存配置（SteamID …{steam_id[-4:]}），完美查询已就绪\n"
+            "注意：完美电竞 Android 端为单设备登录，请勿再用同一账号登录手机端完美 App，否则会挤掉机器人登录态。"
+        )

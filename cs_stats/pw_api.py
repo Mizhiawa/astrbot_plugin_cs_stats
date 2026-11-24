@@ -71,12 +71,17 @@ class PWClient:
         if data.get("statusCode") == 0:
             return data.get("data")
         if data.get("statusCode") == TOKEN_INVALID_CODE:
+            logger.warning(
+                f"[cs_stats] 完美接口 {what} 返回 4001: "
+                f"errorMessage={data.get('errorMessage')!r}, token_len={len(self.config.pw_token)}"
+            )
             newly = not self.token_invalid
             self.token_invalid = True
             raise PWTokenInvalid(newly=newly)
         raise PWError(f"{what}失败：{data.get('errorMessage') or data.get('statusCode')}")
 
     def _ids(self, steam_id: str) -> dict:
+        self._require_auth_config()
         return {"mySteamId": int(self.config.pw_steam_id), "toSteamId": int(steam_id)}
 
     async def login_with_sms(self, mobile: str, code: str) -> tuple[str, str]:
