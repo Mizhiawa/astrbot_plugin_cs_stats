@@ -71,9 +71,12 @@ class PWClient:
         if data.get("statusCode") == 0:
             return data.get("data")
         if data.get("statusCode") == TOKEN_INVALID_CODE:
+            tail = self.config.pw_token[-4:] if len(self.config.pw_token) >= 4 else ""
             logger.warning(
                 f"[cs_stats] 完美接口 {what} 返回 4001: "
-                f"errorMessage={data.get('errorMessage')!r}, token_len={len(self.config.pw_token)}"
+                f"errorMessage={data.get('errorMessage')!r}, "
+                f"token_len={len(self.config.pw_token)}, token_tail=…{tail}, "
+                f"appversion={self.config.pw_appversion!r}"
             )
             newly = not self.token_invalid
             self.token_invalid = True
@@ -84,6 +87,32 @@ class PWClient:
         self._require_auth_config()
         return {"mySteamId": int(self.config.pw_steam_id), "toSteamId": int(steam_id)}
 
+    async def verify_token(self, token: str, steam_id: str) -> tuple[bool, str]:
+        """用刚获取的 token 立即请求一次完美天梯接口，验证是否可用。"""
+        headers = {
+            "Content-Type": "application/json;charset=UTF-8",
+            "User-Agent": "okhttp/4.11.0",
+            "appversion": self.config.pw_appversion,
+            "platform": "android",
+            "token": token,
+        }
+        payload = {
+            "mySteamId": int(steam_id),
+            "toSteamId": int(steam_id),
+            "accessToken": "",
+            "csgoSeasonId": "",
+        }
+        async with httpx.AsyncClient(timeout=self.config.http_timeout) as client:
+            resp = await client.post(
+                f"{API}/csgo/home/pvp/detailStats", json=payload, headers=headers
+            )
+            resp.raise_for_status()
+            body = resp.json()
+        code = body.get("statusCode")
+        if code == 0:
+            return True, "ok"
+        return False, f"statusCode={code}, errorMessage={body.get('errorMessage')!r}"
+
     async def login_with_sms(self, mobile: str, code: str) -> tuple[str, str]:
         """使用完美 App 短信验证码登录，返回 (token, steam_id)。"""
         data = await self._post(
@@ -93,9 +122,16 @@ class PWClient:
         )
         if str(data.get("code")) != "0":
             raise PWError(f"完美登录失败：{data.get('description') or data}")
-        account = ((data.get("result") or {}).get("loginResult") or {}).get("accountInfo") or {}
+        result_obj = data.get("result") or {}
+        login_res = result_obj.get("loginResult") or {}
+        account = login_res.get("accountInfo") or {}
         token = str(account.get("token") or "").strip()
         steam_id = str(account.get("steamId") or "").strip()
+        logger.info(
+            f"[cs_stats] 完美登录响应字段: loginResult_keys={sorted(login_res.keys())}, "
+            f"accountInfo_keys={sorted(account.keys())}, "
+            f"token_len={len(token)}, token_tail=…{token[-4:] if len(token) >= 4 else ''}"
+        )
         if not token or not steam_id:
             raise PWError("完美登录返回数据缺少 token 或 steamId")
         return token, steam_id

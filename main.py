@@ -782,7 +782,19 @@ class CSStatsPlugin(Star):
             save_fn()
         self._reload_config(from_disk=False)
         self.pw.reset_token_state()
-        yield event.plain_result(
-            f"完美登录成功，已自动保存配置（SteamID …{steam_id[-4:]}），完美查询已就绪\n"
-            "注意：完美电竞 Android 端为单设备登录，请勿再用同一账号登录手机端完美 App，否则会挤掉机器人登录态。"
-        )
+
+        try:
+            ok, detail = await self.pw.verify_token(token, steam_id)
+        except Exception as exc:
+            ok, detail = False, get_exc_desc(exc)
+        if ok:
+            yield event.plain_result(
+                f"完美登录成功且接口校验通过（SteamID …{steam_id[-4:]}），完美查询已就绪。"
+                "注意：完美电竞 Android 端为单设备登录，请勿再用同一账号登录手机端完美 App。"
+            )
+        else:
+            logger.warning(f"[cs_stats] 刚登录获得的 token 立即校验失败: {detail}")
+            yield event.plain_result(
+                f"已获取登录 token（SteamID …{steam_id[-4:]}），但立即校验战绩接口失败（{detail}）。"
+                "请查看控制台日志中 `完美登录响应字段` 与 `4001` 信息，或尝试手动抓包填写 pw_token。"
+            )
